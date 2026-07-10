@@ -35,10 +35,18 @@ function setStatus(msg, isErr){
 
 async function loadEntries(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    entries = res && res.value ? JSON.parse(res.value) : [];
+    const user = auth.currentUser;
+    if(!user) throw new Error("Usuário não autenticado");
+    const docRef = doc(db, "revisoes_salvas", user.uid);
+    const docSnap = await getDoc(docRef);
+    if(docSnap.exists()){
+      entries = docSnap.data().entries || [];
+    } else {
+      entries = [];
+    }
     storageOk = true;
   }catch(e){
+    console.error("Erro ao carregar do Firestore:", e);
     entries = [];
     storageOk = false;
     setStatus('Armazenamento indisponível nesta sessão — use exportar/importar backup para não perder o progresso.', true);
@@ -48,9 +56,12 @@ async function loadEntries(){
 async function saveEntries(){
   if(!storageOk) return;
   try{
-    const ok = await window.storage.set(STORAGE_KEY, JSON.stringify(entries), false);
-    if(!ok){ setStatus('Falha ao salvar. Faça um backup exportado por segurança.', true); }
+    const user = auth.currentUser;
+    if(!user) throw new Error("Usuário não autenticado");
+    const docRef = doc(db, "revisoes_salvas", user.uid);
+    await setDoc(docRef, { entries: entries });
   }catch(e){
+    console.error("Erro ao salvar no Firestore:", e);
     storageOk = false;
     setStatus('Armazenamento falhou — faça backup exportado para não perder o progresso.', true);
   }
@@ -196,7 +207,7 @@ async function initApp(){
 // 1. Importações via CDN (compatíveis direto com o navegador)
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
-  import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // 2. Importando a configuração separada do Firebase
